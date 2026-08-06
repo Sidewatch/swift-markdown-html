@@ -43,9 +43,106 @@ public enum MarkdownHTML {
     /// - Returns: The rendered HTML fragment.
     public static func render(_ markdown: String,
                               highlightCode: ((String, String) -> String?)? = nil) -> String {
-        let document = Markdown.Document(parsing: markdown)
+        let (frontmatter, body) = splitFrontmatter(markdown)
+        let document = Markdown.Document(parsing: body)
         var renderer = HTMLRenderer(highlightCode: highlightCode)
-        return renderer.visit(document)
+        return frontmatterHTML(frontmatter) + renderer.visit(document)
+    }
+
+    /// Splits leading YAML frontmatter from the body.
+    ///
+    /// CommonMark has no concept of frontmatter, and left in place it does not merely render as
+    /// stray text — it renders WRONG. The opening `---` is a thematic break, the `key: value`
+    /// lines become a paragraph, and the closing `---` is then read as a setext heading
+    /// underline for that paragraph, so an entire metadata block turns into one enormous `<h2>`.
+    ///
+    /// Recognised only when the document's FIRST line is exactly `---` and a matching closing
+    /// fence exists, so an ordinary document that opens with a thematic break is untouched.
+    ///
+    /// - Returns: The frontmatter's key/value pairs in document order, and the body without it.
+    static func splitFrontmatter(_ markdown: String) -> (pairs: [(key: String, value: String)], body: String) {
+        let lines = markdown.components(separatedBy: "\n")
+        guard lines.first?.trimmingCharacters(in: .whitespaces) == "---" else { return ([], markdown) }
+        guard let close = lines.dropFirst().firstIndex(where: { $0.trimmingCharacters(in: .whitespaces) == "---" })
+        else { return ([], markdown) }
+
+        var pairs: [(String, String)] = []
+        var pendingKey: String?          // a `key: |` or `key: >` block scalar
+        var blockLines: [String] = []
+
+        func flushBlock() {
+            if let k = pendingKey {
+                pairs.append((k, blockLines.joined(separator: " ").trimmingCharacters(in: .whitespaces)))
+                pendingKey = nil
+                blockLines = []
+            }
+        }
+
+        for raw in lines[1..<close] {
+            // Indented continuation of a block scalar, or a list item under a key.
+            if pendingKey != nil, raw.hasPrefix(" ") || raw.hasPrefix("\t") {
+                blockLines.append(raw.trimmingCharacters(in: .whitespaces))
+                continue
+            }
+            flushBlock()
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            guard !line.isEmpty, !line.hasPrefix("#") else { continue }
+            guard let colon = line.firstIndex(of: ":") else { continue }
+            let key = String(line[line.startIndex..<colon]).trimmingCharacters(in: .whitespaces)
+            var value = String(line[line.index(after: colon)...]).trimmingCharacters(in: .whitespaces)
+            // `|` and `>` introduce a block scalar whose text is on the following indented lines.
+            if value == "|" || value == ">" || value == "|-" || value == ">-" {
+                pendingKey = key
+                continue
+            }
+            // Unwrap the quoting YAML allows around a scalar.
+            if value.count >= 2,
+               (value.hasPrefix("\"") && value.hasSuffix("\"")) || (value.hasPrefix("'") && value.hasSuffix("'")) {
+                value = String(value.dropFirst().dropLast())
+            }
+            pairs.append((key, value))
+        }
+        flushBlock()
+
+        let body = lines[(close + 1)...].joined(separator: "\n")
+        return (pairs, body)
+    }
+
+    /// Renders frontmatter as a small definition table above the body.
+    ///
+    /// Shown rather than stripped: slug, title, url and counts are facts about the document, and
+    /// hiding them would mean the preview silently omits half of what the file says. Values that
+    /// look like links are linked, so a `url:` field is usable rather than just readable.
+    /// Shared HTML escaping — the frontmatter table and the body renderer must agree, and two
+    /// implementations of "escape this" is how one of them ends up not escaping quotes.
+    static func escaped(_ s: String, forAttribute: Bool) -> String {
+        var out = ""
+        out.reserveCapacity(s.count)
+        for ch in s {
+            switch ch {
+            case "&": out += "&amp;"
+            case "<": out += "&lt;"
+            case ">": out += "&gt;"
+            case "\"" where forAttribute: out += "&quot;"
+            default:  out.append(ch)
+            }
+        }
+        return out
+    }
+
+    static func frontmatterHTML(_ pairs: [(key: String, value: String)]) -> String {
+        guard !pairs.isEmpty else { return "" }
+        var rows = ""
+        for (key, value) in pairs {
+            let shown: String
+            if value.hasPrefix("http://") || value.hasPrefix("https://") {
+                shown = "<a href=\"\(escaped(value, forAttribute: true))\">\(escaped(value, forAttribute: false))</a>"
+            } else {
+                shown = escaped(value, forAttribute: false)
+            }
+            rows += "<tr><th>\(escaped(key, forAttribute: false))</th><td>\(shown)</td></tr>\n"
+        }
+        return "<table class=\"frontmatter\">\n\(rows)</table>\n"
     }
 }
 
@@ -155,22 +252,7 @@ private struct HTMLRenderer: MarkupVisitor {
     private func escAttr(_ s: String) -> String { escaped(s, forAttribute: true) }
 
     private func escaped(_ s: String, forAttribute: Bool) -> String {
-        let amp = UInt8(ascii: "&"), lt = UInt8(ascii: "<"), gt = UInt8(ascii: ">")
-        let quot = UInt8(ascii: "\"")
-        let utf8 = s.utf8
-        guard utf8.contains(where: { $0 == amp || $0 == lt || $0 == gt || (forAttribute && $0 == quot) })
-        else { return s }
-        var out = [UInt8]()
-        out.reserveCapacity(utf8.count + 16)
-        for byte in utf8 {
-            switch byte {
-            case amp: out.append(contentsOf: "&amp;".utf8)
-            case lt:  out.append(contentsOf: "&lt;".utf8)
-            case gt:  out.append(contentsOf: "&gt;".utf8)
-            case quot where forAttribute: out.append(contentsOf: "&quot;".utf8)
-            default:  out.append(byte)
-            }
-        }
-        return String(decoding: out, as: UTF8.self)
+        MarkdownHTML.escaped(s, forAttribute: forAttribute)
     }
+
 }
