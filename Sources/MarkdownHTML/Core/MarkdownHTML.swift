@@ -31,11 +31,20 @@ public enum MarkdownHTML {
     /// The input is treated as a complete Markdown document. Text and code are
     /// HTML-escaped; raw HTML embedded in the Markdown is passed through verbatim.
     ///
-    /// - Parameter markdown: The Markdown source to render.
+    /// - Parameters:
+    ///   - markdown: The Markdown source to render.
+    ///   - highlightCode: Optional syntax highlighter for fenced blocks. Given the block's
+    ///     source and its fence tag (`swift`, `php`, …), it returns HTML for the inside of the
+    ///     `<code>` element — already escaped — or nil to leave the block plain.
+    ///
+    ///     A closure rather than a dependency: highlighting means tree-sitter and a few dozen
+    ///     grammars, and a Markdown-to-HTML library has no business pulling that in. The host
+    ///     app owns both and wires them together, so this package stays what it says it is.
     /// - Returns: The rendered HTML fragment.
-    public static func render(_ markdown: String) -> String {
+    public static func render(_ markdown: String,
+                              highlightCode: ((String, String) -> String?)? = nil) -> String {
         let document = Markdown.Document(parsing: markdown)
-        var renderer = HTMLRenderer()
+        var renderer = HTMLRenderer(highlightCode: highlightCode)
         return renderer.visit(document)
     }
 }
@@ -45,6 +54,10 @@ public enum MarkdownHTML {
 /// Kept private to the module: it is the rendering machinery behind
 /// ``MarkdownHTML/render(_:)`` and not part of the public surface.
 private struct HTMLRenderer: MarkupVisitor {
+
+    /// Optional per-block syntax highlighter — see ``MarkdownHTML/render(_:highlightCode:)``.
+    let highlightCode: ((String, String) -> String?)?
+
     typealias Result = String
 
     /// Renders a node's children in order and concatenates the results.
@@ -73,6 +86,12 @@ private struct HTMLRenderer: MarkupVisitor {
 
     mutating func visitCodeBlock(_ c: CodeBlock) -> String {
         let cls = c.language.map { " class=\"language-\(escAttr($0))\"" } ?? ""
+        // Highlighted when a highlighter is supplied AND recognises the tag; otherwise the
+        // escaped source exactly as before. An unknown tag, or no highlighter at all, renders
+        // what it always did rather than something half-coloured.
+        if let tag = c.language, let highlighted = highlightCode?(c.code, tag) {
+            return "<pre><code\(cls)>\(highlighted)</code></pre>\n"
+        }
         return "<pre><code\(cls)>\(esc(c.code))</code></pre>\n"
     }
 
