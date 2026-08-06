@@ -44,9 +44,47 @@ public enum MarkdownHTML {
     public static func render(_ markdown: String,
                               highlightCode: ((String, String) -> String?)? = nil) -> String {
         let (frontmatter, body) = splitFrontmatter(markdown)
-        let document = Markdown.Document(parsing: body)
+        let document = Markdown.Document(parsing: normalizeBulletGlyphs(body))
         var renderer = HTMLRenderer(highlightCode: highlightCode)
         return frontmatterHTML(frontmatter) + renderer.visit(document)
+    }
+
+    /// Bullet GLYPHS that people type where a Markdown list marker belongs.
+    ///
+    /// `•` is not list syntax — CommonMark knows only `-`, `*` and `+` — so a run of such lines
+    /// is one paragraph, and lines within a paragraph join with spaces. Forty bulleted items
+    /// become a single wall of text with `•` separators, which is strictly WORSE than reading
+    /// the raw file. Common in exported or scraped documents nobody hand-authored.
+    private static let bulletGlyphs: Set<Character> = ["•", "·", "▪", "‣", "●", "◦"]
+
+    /// Rewrites bullet-glyph lines as real list items so they render as a list.
+    ///
+    /// Deliberately narrow. It fires only when a line's first non-space character is one of
+    /// ``bulletGlyphs`` AND a space follows, and it never touches anything inside a fenced code
+    /// block — where a bullet is content, not intent. Indentation is preserved so nested items
+    /// stay nested.
+    ///
+    /// The blunter alternative — rendering every soft line break as `<br>` — would fix this case
+    /// and break every hard-wrapped document, since plenty of Markdown wraps prose at 80 columns
+    /// and would come out ragged. Fixing the marker is the smaller claim: it changes only lines
+    /// that were already trying to be a list.
+    static func normalizeBulletGlyphs(_ markdown: String) -> String {
+        guard markdown.contains(where: { bulletGlyphs.contains($0) }) else { return markdown }
+        var inFence = false
+        let lines = markdown.components(separatedBy: "\n").map { line -> String in
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~") {
+                inFence.toggle()
+                return line
+            }
+            guard !inFence,
+                  let first = trimmed.first, bulletGlyphs.contains(first),
+                  trimmed.dropFirst().hasPrefix(" ")
+            else { return line }
+            let indent = line.prefix { $0 == " " || $0 == "\t" }
+            return indent + "- " + trimmed.dropFirst().trimmingCharacters(in: .whitespaces)
+        }
+        return lines.joined(separator: "\n")
     }
 
     /// Splits leading YAML frontmatter from the body.
