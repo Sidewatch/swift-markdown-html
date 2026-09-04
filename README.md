@@ -16,7 +16,7 @@ A small Markdown → HTML renderer built on Apple's [swift-markdown](https://git
 ## Requirements
 
 - macOS 14+ (Foundation only; other Apple platforms at SwiftPM's default minimums)
-- Swift 6.0+ (Swift 6 language mode)
+- Swift 6.2+ (Swift 6 language mode)
 
 ## Installation
 
