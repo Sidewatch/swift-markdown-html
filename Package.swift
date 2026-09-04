@@ -3,13 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "MarkdownHTML",
-    platforms: [
-        .iOS(.v13),
-        .macOS(.v10_15),
-        .tvOS(.v13),
-        .watchOS(.v6),
-        .visionOS(.v1)
-    ],
+    platforms: [.macOS(.v14)],
     products: [
         .library(name: "MarkdownHTML", targets: ["MarkdownHTML"]),
     ],
@@ -21,7 +15,7 @@ let package = Package(
             name: "MarkdownHTML",
             dependencies: [.product(name: "Markdown", package: "swift-markdown")],
             path: "Sources",
-            swiftSettings: [.unsafeFlags(["-strict-concurrency=complete"])]
+            swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(name: "MarkdownHTMLTests", dependencies: ["MarkdownHTML"], path: "Tests"),
     ]
