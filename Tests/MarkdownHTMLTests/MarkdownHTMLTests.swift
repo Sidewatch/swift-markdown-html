@@ -2,12 +2,17 @@
 //  MarkdownHTMLTests.swift
 //  Tests for SwiftMarkdownHTML
 //
+//  Tests for `MarkdownHTML.render`: headings, emphasis, lists, code, links and tables produce
+//  the expected HTML.
+//
 //  Created by David Sherlock on 7/9/26.
 //
 
 import XCTest
 @testable import MarkdownHTML
 
+/// Tests for `MarkdownHTML.render`: headings, emphasis, lists, code, links and tables produce
+/// the expected HTML.
 final class MarkdownHTMLTests: XCTestCase {
 
     func testHeading() {
