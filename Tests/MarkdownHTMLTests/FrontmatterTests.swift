@@ -1,3 +1,12 @@
+//
+//  FrontmatterTests.swift
+//  MarkdownHTMLTests
+//
+//  Covers YAML frontmatter handling.
+//
+//  Created by David Sherlock on 8/6/26.
+//
+
 import XCTest
 @testable import MarkdownHTML
 
