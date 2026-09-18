@@ -28,6 +28,18 @@ final class FrontmatterTests: XCTestCase {
         XCTAssertEqual(body, "Body text.")
     }
 
+    /// A file authored on Windows ends every line in CRLF. `.whitespaces` does not contain CR, so
+    /// `---\r` was never a fence and the metadata rendered as the `<h2>` described above.
+    func testCRLFFrontmatterIsRecognised() {
+        let md = "---\r\ntitle: Hello\r\nslug: hello\r\n---\r\nBody text.\r\n"
+        let (pairs, body) = MarkdownHTML.splitFrontmatter(md)
+        XCTAssertEqual(pairs.map(\.key), ["title", "slug"])
+        XCTAssertEqual(pairs.map(\.value), ["Hello", "hello"])
+        XCTAssertFalse(body.contains("title"), "the metadata is out of the body")
+        XCTAssertTrue(body.hasPrefix("Body text."))
+        XCTAssertFalse(MarkdownHTML.render(md).contains("<h2"), "and it never becomes a heading")
+    }
+
     /// The whole point of the conservatism: a horizontal rule is not frontmatter.
     func testLeavesAThematicBreakAlone() {
         let md = "---\n\nJust a document that opens with a rule."

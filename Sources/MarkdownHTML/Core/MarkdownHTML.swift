@@ -99,9 +99,11 @@ public enum MarkdownHTML {
     ///
     /// - Returns: The frontmatter's key/value pairs in document order, and the body without it.
     static func splitFrontmatter(_ markdown: String) -> (pairs: [(key: String, value: String)], body: String) {
+        // `.whitespacesAndNewlines` throughout: a file authored on Windows ends every line in
+        // CRLF, and CR is not in `.whitespaces`, so `---\r` was never a fence (18 Sep 2026).
         let lines = markdown.components(separatedBy: "\n")
-        guard lines.first?.trimmingCharacters(in: .whitespaces) == "---" else { return ([], markdown) }
-        guard let close = lines.dropFirst().firstIndex(where: { $0.trimmingCharacters(in: .whitespaces) == "---" })
+        guard lines.first?.trimmingCharacters(in: .whitespacesAndNewlines) == "---" else { return ([], markdown) }
+        guard let close = lines.dropFirst().firstIndex(where: { $0.trimmingCharacters(in: .whitespacesAndNewlines) == "---" })
         else { return ([], markdown) }
 
         var pairs: [(String, String)] = []
@@ -110,7 +112,7 @@ public enum MarkdownHTML {
 
         func flushBlock() {
             if let k = pendingKey {
-                pairs.append((k, blockLines.joined(separator: " ").trimmingCharacters(in: .whitespaces)))
+                pairs.append((k, blockLines.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)))
                 pendingKey = nil
                 blockLines = []
             }
@@ -119,15 +121,15 @@ public enum MarkdownHTML {
         for raw in lines[1..<close] {
             // Indented continuation of a block scalar, or a list item under a key.
             if pendingKey != nil, raw.hasPrefix(" ") || raw.hasPrefix("\t") {
-                blockLines.append(raw.trimmingCharacters(in: .whitespaces))
+                blockLines.append(raw.trimmingCharacters(in: .whitespacesAndNewlines))
                 continue
             }
             flushBlock()
-            let line = raw.trimmingCharacters(in: .whitespaces)
+            let line = raw.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !line.isEmpty, !line.hasPrefix("#") else { continue }
             guard let colon = line.firstIndex(of: ":") else { continue }
-            let key = String(line[line.startIndex..<colon]).trimmingCharacters(in: .whitespaces)
-            var value = String(line[line.index(after: colon)...]).trimmingCharacters(in: .whitespaces)
+            let key = String(line[line.startIndex..<colon]).trimmingCharacters(in: .whitespacesAndNewlines)
+            var value = String(line[line.index(after: colon)...]).trimmingCharacters(in: .whitespacesAndNewlines)
             // `|` and `>` introduce a block scalar whose text is on the following indented lines.
             if value == "|" || value == ">" || value == "|-" || value == ">-" {
                 pendingKey = key

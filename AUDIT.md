@@ -20,6 +20,19 @@ dead-code and risk-pattern scans, docs drift); line-by-line logic review was tar
 - Build: clean. Tests: green.
 - Nothing to fix in this package.
 
+## Logic review — 18 Sep 2026 (every source and test file, line by line)
+
+Fixed, pinned by a test that fails against the old code:
+
+- **CRLF frontmatter rendered as a heading.** `splitFrontmatter` compared lines trimmed with
+  `.whitespaces`, which does not contain CR, so `---\r` was never a fence: a Windows-authored
+  document's metadata went through CommonMark, where the closing `---` turns the block into one
+  `<h2>`. Every trim in the splitter is `.whitespacesAndNewlines`; the body keeps its own terminators.
+
+Reviewed and sound: the bullet-glyph rewrite (fence-aware, indentation kept, and CR-tolerant because
+it never compares a whole line), block scalars and quoting in the frontmatter, `escaped(_:forAttribute:)`
+shared by the frontmatter table and the body, the fenced-code highlighter hook.
+
 ## Known non-issues (do not "fix" these again)
 
 - `visitTableHead/Body/Row/Cell` show as unreferenced — `MarkupVisitor` requirements, not dead.
@@ -27,3 +40,4 @@ dead-code and risk-pattern scans, docs drift); line-by-line logic review was tar
 ## History
 
 - 17 Sep 2026 — full audit (app + all 20 libraries), Claude with David.
+- 18 Sep 2026 — logic review (every source and test file, line by line), Claude with David.
