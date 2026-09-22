@@ -41,3 +41,4 @@ shared by the frontmatter table and the body, the fenced-code highlighter hook.
 
 - 17 Sep 2026 — full audit (app + all 20 libraries), Claude with David.
 - 18 Sep 2026 — logic review (every source and test file, line by line), Claude with David.
+- 22 Sep 2026 — `MathSpans` added (math on by default in `render`); `MathSpansTests`.

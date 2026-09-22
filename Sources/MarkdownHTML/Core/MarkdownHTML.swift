@@ -40,13 +40,19 @@ public enum MarkdownHTML {
     ///     A closure rather than a dependency: highlighting means tree-sitter and a few dozen
     ///     grammars, and a Markdown-to-HTML library has no business pulling that in. The host
     ///     app owns both and wires them together, so this package stays what it says it is.
+    ///   - math: Whether `$…$` and `$$…$$` are math (GitHub's and pandoc's reading; see
+    ///     `MathSpans`). The TeX comes out untouched in `<span class="math math-inline">` /
+    ///     `<span class="math math-display">` for the host's renderer; without one it shows as
+    ///     written. Off, every dollar is prose.
     /// - Returns: The rendered HTML fragment.
     public static func render(_ markdown: String,
-                              highlightCode: ((String, String) -> String?)? = nil) -> String {
+                              highlightCode: ((String, String) -> String?)? = nil,
+                              math: Bool = true) -> String {
         let (frontmatter, body) = splitFrontmatter(markdown)
-        let document = Markdown.Document(parsing: normalizeBulletGlyphs(body))
+        let extracted = math ? MathSpans.extract(body) : MathSpans.Extraction(markdown: body, spans: [])
+        let document = Markdown.Document(parsing: normalizeBulletGlyphs(extracted.markdown))
         var renderer = HTMLRenderer(highlightCode: highlightCode)
-        return frontmatterHTML(frontmatter) + renderer.visit(document)
+        return frontmatterHTML(frontmatter) + MathSpans.restore(renderer.visit(document), spans: extracted.spans)
     }
 
     /// Bullet GLYPHS that people type where a Markdown list marker belongs.
