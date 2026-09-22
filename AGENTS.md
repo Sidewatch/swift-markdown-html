@@ -8,7 +8,7 @@ A small Markdown → HTML renderer built on Apple's [swift-markdown](https://git
 
 ## Module map
 
-- `Core/` — the engine: MarkdownHTML (`render(_:highlightCode:math:)`), MathSpans (`$…$` / `$$…$$` lifted out before the parse as private-use placeholders and restored after as `.math` spans; fences, inline code and `\$` excluded)
+- `Core/` — the engine: MarkdownHTML (`render(_:highlightCode:math:diagramFences:)`; a diagram fence is `<pre class="TAG">` of its source), MathSpans (`$…$` / `$$…$$` lifted out before the parse as private-use placeholders and restored after as `.math` spans; fences, inline code and `\$` excluded)
 
 ## Rules
 

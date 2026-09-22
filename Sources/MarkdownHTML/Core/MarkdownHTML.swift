@@ -44,14 +44,19 @@ public enum MarkdownHTML {
     ///     `MathSpans`). The TeX comes out untouched in `<span class="math math-inline">` /
     ///     `<span class="math math-display">` for the host's renderer; without one it shows as
     ///     written. Off, every dollar is prose.
+    ///   - diagramFences: Fence tags whose blocks are diagrams, not code: each renders as
+    ///     `<pre class="TAG">` holding the escaped source (GitHub's shape for ```` ```mermaid ````),
+    ///     for the host's renderer to replace; without one the source shows as written. Empty,
+    ///     every fence is code.
     /// - Returns: The rendered HTML fragment.
     public static func render(_ markdown: String,
                               highlightCode: ((String, String) -> String?)? = nil,
-                              math: Bool = true) -> String {
+                              math: Bool = true,
+                              diagramFences: Set<String> = ["mermaid"]) -> String {
         let (frontmatter, body) = splitFrontmatter(markdown)
         let extracted = math ? MathSpans.extract(body) : MathSpans.Extraction(markdown: body, spans: [])
         let document = Markdown.Document(parsing: normalizeBulletGlyphs(extracted.markdown))
-        var renderer = HTMLRenderer(highlightCode: highlightCode)
+        var renderer = HTMLRenderer(highlightCode: highlightCode, diagramFences: diagramFences)
         return frontmatterHTML(frontmatter) + MathSpans.restore(renderer.visit(document), spans: extracted.spans)
     }
 
@@ -200,6 +205,8 @@ private struct HTMLRenderer: MarkupVisitor {
 
     /// Optional per-block syntax highlighter — see ``MarkdownHTML/render(_:highlightCode:)``.
     let highlightCode: ((String, String) -> String?)?
+    /// Fence tags rendered as `<pre class="TAG">` diagrams rather than code.
+    let diagramFences: Set<String>
 
     typealias Result = String
 
@@ -228,6 +235,10 @@ private struct HTMLRenderer: MarkupVisitor {
     mutating func visitHTMLBlock(_ h: HTMLBlock) -> String { h.rawHTML }
 
     mutating func visitCodeBlock(_ c: CodeBlock) -> String {
+        // A diagram fence is its source in a `<pre class="TAG">`, for the host's renderer.
+        if let tag = c.language?.trimmingCharacters(in: .whitespaces).lowercased(), diagramFences.contains(tag) {
+            return "<pre class=\"\(escAttr(tag))\">\(esc(c.code))</pre>\n"
+        }
         let cls = c.language.map { " class=\"language-\(escAttr($0))\"" } ?? ""
         // Highlighted when a highlighter is supplied AND recognises the tag; otherwise the
         // escaped source exactly as before. An unknown tag, or no highlighter at all, renders
