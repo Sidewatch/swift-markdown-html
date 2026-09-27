@@ -1,3 +1,7 @@
+> **This package has moved.** It is now the `MarkdownHTML` module of [swift-html-preview](https://github.com/Sidewatch/swift-html-preview), with its full
+> history. Depend on `.package(url: "https://github.com/Sidewatch/swift-html-preview.git", from: "0.1.0")` and the `MarkdownHTML` product;
+> `import MarkdownHTML` is unchanged. This repository is archived.
+
 # Swift Markdown HTML
 
 A small Markdown → HTML renderer built on Apple's [swift-markdown](https://github.com/apple/swift-markdown) (cmark-gfm) — its only dependency. Give it a CommonMark + GitHub-Flavored-Markdown string and get back an HTML fragment: one static call, no configuration.
